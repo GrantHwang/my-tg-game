@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Telegram Runner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; }
+        canvas { display: block; margin: 0 auto; }
+    </style>
+</head>
+<body>
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const config = {
+        type: Phaser.AUTO,
+        width: 400,
+        height: 600,
+        backgroundColor: '#3390ec', // Telegram 蓝色背景
+        physics: {
+            default: 'arcade',
+            arcade: { gravity: { y: 1000 }, debug: false }
+        },
+        scene: { preload: preload, create: create, update: update }
+    };
+
+    const game = new Phaser.Game(config);
+    let player, obstacles, score = 0, scoreText, isGameOver = false;
+
+    function preload() {
+        // 使用简单的图形代替图片素材
+    }
+
+    function create() {
+        // 1. 创建地板
+        const ground = this.add.rectangle(200, 580, 400, 40, 0x666666);
+        this.physics.add.existing(ground, true);
+
+        // 2. 创建玩家 (红色方块)
+        player = this.add.rectangle(100, 500, 40, 40, 0xff0000);
+        this.physics.add.existing(player);
+        player.body.setCollideWorldBounds(true);
+
+        // 3. 障碍物组
+        obstacles = this.physics.add.group();
+
+        // 4. 碰撞检测
+        this.physics.add.collider(player, ground);
+        this.physics.add.collider(player, obstacles, hitObstacle, null, this);
+
+        // 5. 分数显示
+        scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: '32px', fill: '#fff' });
+
+        // 6. 点击跳转 (支持手机触摸)
+        this.input.on('pointerdown', jump);
+
+        // 7. 定时生成障碍物
+        this.time.addEvent({
+            delay: 1500,
+            callback: spawnObstacle,
+            callbackScope: this,
+            loop: true
+        });
+    }
+
+    function jump() {
+        if (player.body.touching.down) {
+            player.body.setVelocityY(-500);
+            tg.HapticFeedback.impactOccurred('light');
+        }
+    }
+
+    function spawnObstacle() {
+        if (isGameOver) return;
+        const x = 450;
+        const obstacle = this.add.rectangle(x, 540, 30, 40, 0x000000);
+        obstacles.add(obstacle);
+        this.physics.add.existing(obstacle);
+        obstacle.body.setAllowGravity(false);
+        obstacle.body.setVelocityX(-200 - (score * 5)); // 随分数增加速度
+    }
+
+    function update() {
+        if (isGameOver) return;
+
+        obstacles.getChildren().forEach(obstacle => {
+            if (obstacle.x < -20) {
+                obstacle.destroy();
+                score += 10;
+                scoreText.setText('Score: ' + score);
+            }
+        });
+    }
+
+    function hitObstacle() {
+        isGameOver = true;
+        this.physics.pause();
+        player.setFillStyle(0xffff00);
+        tg.HapticFeedback.notificationOccurred('error');
+        
+        const gameOverText = this.add.text(100, 250, 'GAME OVER\nTap to Restart', { 
+            fontSize: '32px', fill: '#fff', align: 'center' 
+        });
+        
+        this.input.once('pointerdown', () => {
+            score = 0;
+            isGameOver = false;
+            this.scene.restart();
+        });
+    }
+</script>
+</body>
+</html>
